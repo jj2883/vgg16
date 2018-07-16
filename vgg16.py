@@ -33,13 +33,13 @@ parser.add_argument('--epochs', default=90, type=int, metavar='N',
                     help='number of total epochs to run')
 parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                     help='manual epoch number (useful on restarts)')
-parser.add_argument('-b', '--batch-size', default=256, type=int,
+parser.add_argument('-b', '--batch-size', default=128, type=int,
                     metavar='N', help='mini-batch size (default: 256)')
-parser.add_argument('--lr', '--learning-rate', default=0.1, type=float,
+parser.add_argument('--lr', '--learning-rate', default=0.01, type=float,
                     metavar='LR', help='initial learning rate')
 parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
                     help='momentum')
-parser.add_argument('--weight-decay', '--wd', default=1e-4, type=float,
+parser.add_argument('--weight-decay', '--wd', default=5*1e-4, type=float,
                     metavar='W', help='weight decay (default: 1e-4)')
 parser.add_argument('--print-freq', '-p', default=10, type=int,
                     metavar='N', help='print frequency (default: 10)')
@@ -61,10 +61,12 @@ best_prec1 = 0
 vgg16_config = [64,64, 'Max', 128, 128, 'Max', 256, 256, 256, 'Max', 512, 512, 512, 'Max',512, 512, 512, 'Max']
 
 class vggNet(nn.Module):
-    def __init__(self):
+    def __init__(self,conv_features, fc_features):
         super(vggNet, self).__init__()
-        self.conv_layers = make_conv_layers(vgg16_config)
-        self.fc_layers = make_fc_layers()
+#        self.conv_layers = make_conv_layers(vgg16_config)
+#        self.fc_layers = make_fc_layers()
+        self.conv_layers = conv_features
+        self.fc_layers = fc_features
         self._initialize_weights()
 
     def forward(self,x):
@@ -74,9 +76,15 @@ class vggNet(nn.Module):
         return x
 
     def _initialize_weights(self):
-       # for m in self.modules():
-        #    if isinstance
-        pass
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.Linear):
+                nn.init.normal_(m.weight, 0.01)
+                nn.init.constant_(m.bias, 0)
+            
 
 
 def make_conv_layers(cfg):
@@ -86,14 +94,22 @@ def make_conv_layers(cfg):
         if ii == 'Max':
             layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
         else:
-            conv2d = nn.Conv2d(in_channels, 64, kernel_size=3, padding=1)
+            conv2d = nn.Conv2d(in_channels, ii, kernel_size=3, padding=1)
             layers += [conv2d, nn.ReLU(inplace=True)]
             in_channels = ii
     return nn.Sequential(*layers)
 
 
 def make_fc_layers():
-    return nn.Sequential(nn.Linear(512*7*7, 4096), nn.ReLU(True), nn.Dropout(), nn.Linear(4096, 4096), nn.ReLU(True), nn.Dropout(), nn.Linear(4096,1000))
+    return nn.Sequential(
+            nn.Linear(512, 4096), 
+            nn.ReLU(True), 
+            nn.Dropout(), 
+            nn.Linear(4096, 4096), 
+            nn.ReLU(True), 
+            nn.Dropout(), 
+            nn.Linear(4096,1000)
+            )
 
 
 
@@ -128,8 +144,8 @@ def main():
 #        model = torch.nn.parallel.DistributedDataParallel(model)
 #
     device = torch.device("cuda" if use_cuda else "cpu")
-    model = vggNet()
-    model.to(device)
+#    model = vggNet().cuda().to("cuda")
+    model = vggNet(make_conv_layers(vgg16_config),make_fc_layers()).cuda()
 
 # define loss function (criterion) and optimizer
     criterion = nn.CrossEntropyLoss().cuda()
@@ -182,9 +198,8 @@ def main():
             train=True,
             download=True,
             transform=transforms.Compose([
-                transforms.RandomResizedCrop(224),
                 transforms.RandomHorizontalFlip(),
-                transforms.ColorJitter(),
+ #               transforms.ColorJitter(),
                 transforms.ToTensor(),
                 transforms.Normalize(
                     mean=[0.485, 0.456, 0.406],
@@ -202,7 +217,26 @@ def main():
 #        train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
 #        num_workers=args.workers, pin_memory=True, sampler=train_sampler)
 
-    val_loader = torch.utils.data.DataLoader(datasets.CIFAR10('../data', train=False, download=True, transform = transforms.Compose([transforms.RandomResizedCrop(224), transforms.RandomHorizontalFlip(), transforms.ColorJitter(), transforms.ToTensor(), transforms.Normalize(mean = [0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),])), batch_size = 256, shuffle = False, num_workers = args.workers, pin_memory = True)
+    val_loader = torch.utils.data.DataLoader(
+            datasets.CIFAR10(
+                '../data',
+                train=False,
+                download=True,
+                transform = transforms.Compose([
+                    transforms.RandomHorizontalFlip(),
+#                    transforms.ColorJitter(), 
+                    transforms.ToTensor(), 
+                    transforms.Normalize(
+                        mean = [0.485, 0.456, 0.406], 
+                        std=[0.229, 0.224, 0.225]
+                     ),
+                ])
+            ),
+            batch_size=256, 
+            shuffle=False,
+            num_workers=args.workers, 
+            pin_memory=True
+        )
 
 #    val_loader = torch.utils.data.DataLoader(
 #        datasets.ImageFolder(valdir, transforms.Compose([
@@ -234,7 +268,7 @@ def main():
         best_prec1 = max(prec1, best_prec1)
         save_checkpoint({
             'epoch': epoch + 1,
-            'arch': args.arch,
+            'arch': 'VGG16',
             'state_dict': model.state_dict(),
             'best_prec1': best_prec1,
             'optimizer' : optimizer.state_dict(),
@@ -257,7 +291,7 @@ def train(train_loader, model, criterion, optimizer, epoch):
         data_time.update(time.time() - end)
 
         target = target.cuda(non_blocking=True)
-
+        input = input.cuda()
         # compute output
         output = model(input)
         loss = criterion(output, target)
@@ -301,6 +335,7 @@ def validate(val_loader, model, criterion):
         end = time.time()
         for i, (input, target) in enumerate(val_loader):
             target = target.cuda(non_blocking=True)
+            input = input.cuda()
 
             # compute output
             output = model(input)
