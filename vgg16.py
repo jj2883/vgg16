@@ -2,6 +2,7 @@ import argparse
 import os
 import shutil
 import time
+import math
 
 import torch
 import torch.nn as nn
@@ -29,18 +30,18 @@ parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
  #                       ' (default: resnet18)')
 parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
                     help='number of data loading workers (default: 4)')
-parser.add_argument('--epochs', default=90, type=int, metavar='N',
-                    help='number of total epochs to run')
+parser.add_argument('--epochs', default=74, type=int, metavar='N',
+                    help='number of total epochs to run MNISTdefault = 74')
 parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                     help='manual epoch number (useful on restarts)')
-parser.add_argument('-b', '--batch-size', default=50, type=int,
-                    metavar='N', help='mini-batch size (default: 256)')
+parser.add_argument('-b', '--batch_size', default=50, type=int,
+                    metavar='N', help='mini-batch size (MNISTdefault: 256)')
 parser.add_argument('--lr', '--learning-rate', default=0.01, type=float,
                     metavar='LR', help='initial learning rate')
 parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
                     help='momentum')
-parser.add_argument('--weight-decay', '--wd', default=1*1e-5, type=float,
-                    metavar='W', help='weight decay (default: 1e-4)')
+parser.add_argument('--weight-decay', '--wd', default=5*1e-4, type=float,
+                    metavar='W', help='weight decay (default: 5e-4)')
 parser.add_argument('--print-freq', '-p', default=10, type=int,
                     metavar='N', help='print frequency (default: 10)')
 parser.add_argument('--resume', default='', type=str, metavar='PATH',
@@ -67,7 +68,8 @@ class vggNet(nn.Module):
 #        self.fc_layers = make_fc_layers()
         self.conv_layers = conv_features
         self.fc_layers = fc_features
-        self._initialize_weights()
+        init_weight(self)
+
 
     def forward(self,x):
         x = self.conv_layers(x)
@@ -75,16 +77,15 @@ class vggNet(nn.Module):
         x = self.fc_layers(x)
         return x
 
-    def _initialize_weights(self):
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
-            elif isinstance(m, nn.Linear):
-                nn.init.normal_(m.weight, 0.1)
-                nn.init.constant_(m.bias, 0)
-            
+def init_weight(net):
+    for m in net.modules():
+        if isinstance(m, nn.Conv2d):
+            n = m.kernel_size[0]* m.kernel_size[1]*m.out_channels
+            m.weight.data.normal_(0, math.sqrt(2/n))
+            m.bias.data.zero_()
+        elif isinstance(m,nn.Linear):
+            m.weight.data.normal_(0, 0.02)
+
 
 
 def make_conv_layers(cfg):
@@ -108,22 +109,13 @@ def make_fc_layers():
             nn.Linear(4096, 4096), 
             nn.ReLU(True), 
             nn.Dropout(), 
-            nn.Linear(4096,1000)
+            nn.Linear(4096,10)
             )
-
-
-
 
 def main():
     global args, best_prec1
     args = parser.parse_args()
     use_cuda = not args.no_cuda and torch.cuda.is_available()
-
-    args.distributed = args.world_size > 1
-
-    if args.distributed:
-        dist.init_process_group(backend=args.dist_backend, init_method=args.dist_url,
-                                world_size=args.world_size)
 
     # create model
 #    if args.pretrained:
@@ -146,6 +138,24 @@ def main():
     device = torch.device("cuda" if use_cuda else "cpu")
 #    model = vggNet().cuda().to("cuda")
     model = vggNet(make_conv_layers(vgg16_config),make_fc_layers()).cuda()
+
+    def init_vgg(net):
+        import math
+        for m in net.modules():
+            if isinstance(m, nn.Conv2d):
+                c_out, _, kh, kw = m.weight.size()
+                n = kh * kw * c_out
+                m.weight.data.normal_(0, math.sqrt(2 / n))
+                if m.bias is not None:
+                    m.bias.data.zero_()
+            elif isinstance(m, nn.BatchNorm2d):
+                m.weight.data.fill_(1)
+                m.bias.data.zero_()
+            elif isinstance(m, nn.Linear):
+                m.weight.data.normal_(0, 0.01)
+                m.bias.data.zero_()
+
+    init_vgg(model)
 
 # define loss function (criterion) and optimizer
     criterion = nn.CrossEntropyLoss().cuda()
@@ -207,8 +217,8 @@ def main():
                 ),
             ])
         ),
-        batch_size=256,
-        shuffle=False,
+        batch_size=args.batch_size,
+        shuffle=True,
         num_workers=args.workers,
         pin_memory=True
     )
@@ -232,7 +242,7 @@ def main():
                      ),
                 ])
             ),
-            batch_size=256, 
+            batch_size=args.batch_size, 
             shuffle=False,
             num_workers=args.workers, 
             pin_memory=True
@@ -248,13 +258,11 @@ def main():
 #        batch_size=args.batch_size, shuffle=False,
 #        num_workers=args.workers, pin_memory=True)
 
-    if args.evaluate:
-        validate(val_loader, model, criterion)
-        return
+#    if args.evaluate:
+#        validate(val_loader, model, criterion)
+#        return
 
     for epoch in range(args.start_epoch, args.epochs):
-        if args.distributed:
-            train_sampler.set_epoch(epoch)
         adjust_learning_rate(optimizer, epoch)
 
         # train for one epoch
@@ -286,22 +294,21 @@ def train(train_loader, model, criterion, optimizer, epoch):
     model.train()
 
     end = time.time()
-    for i, (input, target) in enumerate(train_loader):
+    for i, (img, target) in enumerate(train_loader):
         # measure data loading time
         data_time.update(time.time() - end)
 
-        target = target.cuda(non_blocking=True)
-        input = input.cuda()
+        target = target.cuda()
+        img = img.cuda()
         # compute output
-        output = model(input)
+        output = model(img)
         loss = criterion(output, target)
 
         # measure accuracy and record loss
         prec1, prec5 = accuracy(output, target, topk=(1, 5))
-        losses.update(loss.item(), input.size(0))
-        top1.update(prec1[0], input.size(0))
-        top5.update(prec5[0], input.size(0))
-
+        losses.update(loss.item(), img.size(0))
+        top1.update(prec1[0], img.size(0))
+        top5.update(prec5[0], img.size(0))
         # compute gradient and do SGD step
         optimizer.zero_grad()
         loss.backward()
@@ -313,14 +320,11 @@ def train(train_loader, model, criterion, optimizer, epoch):
 
         if i % args.print_freq == 0:
             print('Epoch: [{0}][{1}/{2}]\t'
-                  'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-                  'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
                   'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                  'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
-                  'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
-                   epoch, i, len(train_loader), batch_time=batch_time,
-                   data_time=data_time, loss=losses, top1=top1, top5=top5))
-
+                  'Prec@1 {top1.val:.2f} ({top1.avg:.2f})\t'
+                  'Prec@5 {top5.val:.2f} ({top5.avg:.2f})'.format(
+                   epoch, i, len(train_loader),
+                   loss=losses, top1=top1, top5=top5))
 
 def validate(val_loader, model, criterion):
     batch_time = AverageMeter()
@@ -333,19 +337,19 @@ def validate(val_loader, model, criterion):
 
     with torch.no_grad():
         end = time.time()
-        for i, (input, target) in enumerate(val_loader):
+        for i, (img, target) in enumerate(val_loader):
             target = target.cuda(non_blocking=True)
-            input = input.cuda()
+            img = img.cuda()
 
             # compute output
-            output = model(input)
+            output = model(img)
             loss = criterion(output, target)
 
             # measure accuracy and record loss
             prec1, prec5 = accuracy(output, target, topk=(1, 5))
-            losses.update(loss.item(), input.size(0))
-            top1.update(prec1[0], input.size(0))
-            top5.update(prec5[0], input.size(0))
+            losses.update(loss.item(), img.size(0))
+            top1.update(prec1[0], img.size(0))
+            top5.update(prec5[0], img.size(0))
 
             # measure elapsed time
             batch_time.update(time.time() - end)
@@ -353,11 +357,10 @@ def validate(val_loader, model, criterion):
 
             if i % args.print_freq == 0:
                 print('Test: [{0}/{1}]\t'
-                      'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                       'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
                       'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
                       'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
-                       i, len(val_loader), batch_time=batch_time, loss=losses,
+                       i, len(val_loader), loss=losses,
                        top1=top1, top5=top5))
 
         print(' * Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f}'
@@ -392,10 +395,20 @@ class AverageMeter(object):
 
 def adjust_learning_rate(optimizer, epoch):
     """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
-    lr = args.lr * (0.1 ** (epoch // 30))
-    for param_group in optimizer.param_groups:
-        param_group['lr'] = lr
-
+#    lr = args.lr * (0.1 ** (epoch // 30))
+    if epoch == 30: 
+        lr = args.lr * 0.1
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = lr
+    
+    if epoch == 45: 
+        lr = lr * 0.5
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = lr
+    if epoch == 60: 
+        lr = lr * 0.1
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = lr
 
 def accuracy(output, target, topk=(1,)):
     """Computes the precision@k for the specified values of k"""
