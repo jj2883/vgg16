@@ -4,6 +4,11 @@ import shutil
 import time
 import math
 
+import numpy as np
+import matplotlib
+import matplotlib.pyplot as plt
+
+
 import torch
 import torch.nn as nn
 import torch.nn.parallel
@@ -275,18 +280,59 @@ def main():
 #        validate(val_loader, model, criterion)
 #        return
 
+
+
+
+
+    train_losses =np.array([])
+    train_prec1s =np.array([])
+    eval_losses =np.array([])
+    eval_prec1s =np.array([])
+    x_plot = np.linspace(args.start_epoch,args.epochs -1, args.epochs,endpoint=True)
+
+    
+    
+    
+    
+    
+    
+    
+    
+    
     for epoch in range(args.start_epoch, args.epochs):
         adjust_learning_rate(optimizer, epoch)
 
         # train for one epoch
-        train(train_loader, model, criterion, optimizer, epoch,f)
+        train_loss, train_prec1 = train(train_loader, model, criterion, optimizer, epoch,f)
 
         # evaluate on validation set
-        prec1 = validate(val_loader, model, criterion,f)
+        eval_loss, eval_prec1 = validate(val_loader, model, criterion,f)
+
+
+
+
+
+        train_losses =np.append( train_losses + train_loss
+        train_prec1s = train_prec1s + train_prec1
+        eval_losses = eval_losses + eval_loss
+        eval_prec1s = eval_prec1s + eval_prec1
+#
+#        train_loss.append(train_losses)
+#        train_prec1.append(train_prec1s)
+#        eval_loss.append(eval_losses)
+#        eval_prec1.append(eval_prec1s)
+
+
+
+
+
+
+
+
 
         # remember best prec@1 and save checkpoint
-        is_best = prec1 > best_prec1
-        best_prec1 = max(prec1, best_prec1)
+        is_best = eval_prec1 > best_prec1
+        best_prec1 = max(eval_prec1, best_prec1)
         save_checkpoint({
             'epoch': epoch + 1,
             'arch': 'VGG16',
@@ -294,7 +340,29 @@ def main():
             'best_prec1': best_prec1,
             'optimizer' : optimizer.state_dict(),
         }, is_best)
+
+
+
+
+
+
+
+
+
+
+
+    plt.plot(x_plot,train_losses)
+    plt.plot(x_plot,eval_losses)
+    matplotlib.use('Agg')
+    plt.savefig('first plot')
+
     f.close()
+
+
+
+
+
+
 
 def train(train_loader, model, criterion, optimizer, epoch,f):
     batch_time = AverageMeter()
@@ -344,6 +412,9 @@ def train(train_loader, model, criterion, optimizer, epoch,f):
                   'Prec@5 {top5.val:.2f} ({top5.avg:.2f})'.format(
                    epoch, i, len(train_loader),
                    loss=losses, top1=top1, top5=top5))
+        
+    return losses.avg, top1.avg
+
 
 def validate(val_loader, model, criterion,f):
     batch_time = AverageMeter()
@@ -393,7 +464,7 @@ def validate(val_loader, model, criterion,f):
         print(' * Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f}'
               .format(top1=top1, top5=top5))
 
-    return top1.avg
+    return losses.avg, top1.avg
 
 
 def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
