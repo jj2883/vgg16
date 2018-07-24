@@ -398,6 +398,14 @@ def adjust_learning_rate(optimizer, epoch):
     lr = args.lr * (0.1 ** (epoch // 30))
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
+    lr = args.lr * (0.1 ** (epoch // 45))
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr
+    lr = args.lr * (0.1 ** (epoch // 60))
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr
+
+
 
 def accuracy(output, target, topk=(1,)):
     """Computes the precision@k for the specified values of k"""
