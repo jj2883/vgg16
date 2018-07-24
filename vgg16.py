@@ -209,7 +209,8 @@ def main():
             download=True,
             transform=transforms.Compose([
                 transforms.RandomHorizontalFlip(),
- #               transforms.ColorJitter(),
+                transforms.RandomCrop(32,4),
+                #               transforms.ColorJitter(),
                 transforms.ToTensor(),
                 transforms.Normalize(
                     mean=[0.485, 0.456, 0.406],
@@ -233,7 +234,7 @@ def main():
                 train=False,
                 download=True,
                 transform = transforms.Compose([
-                    transforms.RandomHorizontalFlip(),
+#                    transforms.RandomHorizontalFlip(),
 #                    transforms.ColorJitter(), 
                     transforms.ToTensor(), 
                     transforms.Normalize(
