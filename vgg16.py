@@ -113,10 +113,22 @@ def make_fc_layers():
             )
 
 def main():
+    
+#SAVE filename
+    path_current = os.path.dirname(os.path.realpath(__file__))
+    path_subdir = 'dataset'
+    data_filename = 'VGGdataset.txt'
+    
+    path_file = os.path.join(path_current,path_subdir,data_filename)
+    f=open(path_file,'w')
+    
+
+
+
     global args, best_prec1
     args = parser.parse_args()
     use_cuda = not args.no_cuda and torch.cuda.is_available()
-
+    
     # create model
 #    if args.pretrained:
 #        print("=> using pre-trained model '{}'".format(args.arch))
@@ -267,10 +279,10 @@ def main():
         adjust_learning_rate(optimizer, epoch)
 
         # train for one epoch
-        train(train_loader, model, criterion, optimizer, epoch)
+        train(train_loader, model, criterion, optimizer, epoch,f)
 
         # evaluate on validation set
-        prec1 = validate(val_loader, model, criterion)
+        prec1 = validate(val_loader, model, criterion,f)
 
         # remember best prec@1 and save checkpoint
         is_best = prec1 > best_prec1
@@ -282,9 +294,9 @@ def main():
             'best_prec1': best_prec1,
             'optimizer' : optimizer.state_dict(),
         }, is_best)
+    f.close()
 
-
-def train(train_loader, model, criterion, optimizer, epoch):
+def train(train_loader, model, criterion, optimizer, epoch,f):
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
@@ -320,6 +332,12 @@ def train(train_loader, model, criterion, optimizer, epoch):
         end = time.time()
 
         if i % args.print_freq == 0:
+            f.write('Epoch: [{0}][{1}/{2}]\t'
+                  'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+                  'Prec@1 {top1.val:.2f} ({top1.avg:.2f})\t'
+                  'Prec@5 {top5.val:.2f} ({top5.avg:.2f})'.format(
+                   epoch, i, len(train_loader),
+                   loss=losses, top1=top1, top5=top5))
             print('Epoch: [{0}][{1}/{2}]\t'
                   'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
                   'Prec@1 {top1.val:.2f} ({top1.avg:.2f})\t'
@@ -327,7 +345,7 @@ def train(train_loader, model, criterion, optimizer, epoch):
                    epoch, i, len(train_loader),
                    loss=losses, top1=top1, top5=top5))
 
-def validate(val_loader, model, criterion):
+def validate(val_loader, model, criterion,f):
     batch_time = AverageMeter()
     losses = AverageMeter()
     top1 = AverageMeter()
@@ -357,6 +375,12 @@ def validate(val_loader, model, criterion):
             end = time.time()
 
             if i % args.print_freq == 0:
+                f.write('Test: [{0}/{1}]\t'
+                      'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+                      'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
+                      'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
+                       i, len(val_loader), loss=losses,
+                       top1=top1, top5=top5))
                 print('Test: [{0}/{1}]\t'
                       'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
                       'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
@@ -364,6 +388,8 @@ def validate(val_loader, model, criterion):
                        i, len(val_loader), loss=losses,
                        top1=top1, top5=top5))
 
+        f.write(' * Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f}'
+              .format(top1=top1, top5=top5))
         print(' * Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f}'
               .format(top1=top1, top5=top5))
 
