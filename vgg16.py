@@ -96,7 +96,7 @@ def make_conv_layers(cfg):
             layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
         else:
             conv2d = nn.Conv2d(in_channels, ii, kernel_size=3, padding=1)
-            layers += [conv2d, nn.ReLU(inplace=True)]
+            layers += [conv2d,nn.BatchNorm2d(ii), nn.ReLU(inplace=True)]
             in_channels = ii
     return nn.Sequential(*layers)
 
@@ -398,13 +398,6 @@ def adjust_learning_rate(optimizer, epoch):
     lr = args.lr * (0.1 ** (epoch // 30))
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
-    lr = args.lr * (0.1 ** (epoch // 45))
-    for param_group in optimizer.param_groups:
-        param_group['lr'] = lr
-    lr = args.lr * (0.1 ** (epoch // 60))
-    for param_group in optimizer.param_groups:
-        param_group['lr'] = lr
-
 
 
 def accuracy(output, target, topk=(1,)):
