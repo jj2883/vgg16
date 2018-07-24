@@ -333,9 +333,9 @@ def train(train_loader, model, criterion, optimizer, epoch,f):
 
         if i % args.print_freq == 0:
             f.write('Epoch: [{0}][{1}/{2}]\t'
-                  'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                  'Prec@1 {top1.val:.2f} ({top1.avg:.2f})\t'
-                  'Prec@5 {top5.val:.2f} ({top5.avg:.2f})'.format(
+                  'Loss {loss.val:.4f}({loss.avg:.4f})\t'
+                  'Prec@1 {top1.val:.2f}({top1.avg:.2f})\t'
+                  'Prec@5 {top5.val:.2f}({top5.avg:.2f})\r\n'.format(
                    epoch, i, len(train_loader),
                    loss=losses, top1=top1, top5=top5))
             print('Epoch: [{0}][{1}/{2}]\t'
@@ -378,7 +378,7 @@ def validate(val_loader, model, criterion,f):
                 f.write('Test: [{0}/{1}]\t'
                       'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
                       'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
-                      'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
+                      'Prec@5 {top5.val:.3f} ({top5.avg:.3f})\r\n'.format(
                        i, len(val_loader), loss=losses,
                        top1=top1, top5=top5))
                 print('Test: [{0}/{1}]\t'
@@ -388,7 +388,7 @@ def validate(val_loader, model, criterion,f):
                        i, len(val_loader), loss=losses,
                        top1=top1, top5=top5))
 
-        f.write(' * Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f}'
+        f.write(' * Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f}\r\n'
               .format(top1=top1, top5=top5))
         print(' * Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f}'
               .format(top1=top1, top5=top5))
