@@ -378,7 +378,7 @@ def main():
     ax_prec.plot(x_epoch,eval_prec1s,label='Test Best1')
     ax_prec.legend(loc=1)
     ax_prec.set_xlabel('epoch')
-    ax_prec.set_ylabel('loss')
+    ax_prec.set_ylabel('Best1 Precision')
     ax_prec.set_title('Best1 of Train and Test')
     plot_prec_filename = 'VGGprec.png'
     path_prec_file = os.path.join(path_current,path_subdir,plot_prec_filename)
