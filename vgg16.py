@@ -284,11 +284,12 @@ def main():
 
 
 
-    train_losses =np.array([])
-    train_prec1s =np.array([])
-    eval_losses =np.array([])
-    eval_prec1s =np.array([])
-    x_plot = np.linspace(args.start_epoch,args.epochs -1, args.epochs,endpoint=True)
+    train_losses =np.zeros((args.epochs))
+    train_prec1s =np.zeros((args.epochs))
+    eval_losses =np.zeros((args.epochs))
+    eval_prec1s =np.zeros((args.epochs))
+    x_epoch = np.zeros((args.epochs))
+#    x_epoch = np.linspace(args.start_epoch,args.epochs -1, args.epochs,endpoint=True)
 
     
     
@@ -310,13 +311,16 @@ def main():
 
 
 
-
-
-        train_losses =np.append( train_losses + train_loss
-        train_prec1s = train_prec1s + train_prec1
-        eval_losses = eval_losses + eval_loss
-        eval_prec1s = eval_prec1s + eval_prec1
-#
+        train_losses[epoch] = train_loss 
+        train_prec1s[epoch] = train_prec1
+        eval_losses[epoch] = eval_loss
+        eval_prec1s[epoch] = eval_prec1
+        x_epoch[epoch] = epoch
+#        train_losses =np.append( train_losses + train_loss
+#        train_prec1s = train_prec1s + train_prec1
+#        eval_losses = eval_losses + eval_loss
+#        eval_prec1s = eval_prec1s + eval_prec1
+##
 #        train_loss.append(train_losses)
 #        train_prec1.append(train_prec1s)
 #        eval_loss.append(eval_losses)
@@ -350,11 +354,36 @@ def main():
 
 
 
-
-    plt.plot(x_plot,train_losses)
-    plt.plot(x_plot,eval_losses)
     matplotlib.use('Agg')
-    plt.savefig('first plot')
+    
+    plt.clf()
+    plt.close()
+    fig_loss = plt.figure()
+    ax_loss = fig_loss.add_subplot(1,1,1)
+    ax_loss.plot(x_epoch,train_losses,label='Train Loss')
+    ax_loss.plot(x_epoch,eval_losses,label='Test Loss')
+    ax_loss.legend(loc=1)
+    ax_loss.set_xlabel('epoch')
+    ax_loss.set_ylabel('loss')
+    ax_loss.set_title('Loss of Train and Test')
+    plot_loss_filename = 'VGGloss.png'
+    path_loss_file = os.path.join(path_current,path_subdir,plot_loss_filename)
+    fig_loss.savefig(path_loss_file)
+
+    plt.clf()
+    plt.close()
+    fig_prec = plt.figure()
+    ax_prec = fig_prec.add_subplot(1,1,1)
+    ax_prec.plot(x_epoch,train_prec1s,label='Train Best1')
+    ax_prec.plot(x_epoch,eval_prec1s,label='Test Best1')
+    ax_prec.legend(loc=1)
+    ax_prec.set_xlabel('epoch')
+    ax_prec.set_ylabel('loss')
+    ax_prec.set_title('Best1 of Train and Test')
+    plot_prec_filename = 'VGGprec.png'
+    path_prec_file = os.path.join(path_current,path_subdir,plot_prec_filename)
+    fig_prec.savefig(path_prec_file)
+
 
     f.close()
 
